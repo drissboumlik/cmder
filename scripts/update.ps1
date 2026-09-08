@@ -32,26 +32,31 @@ Param(
     # -whatif switch to not actually make changes
 
     # Path to the vendor configuration source file
-    [string]$sourcesPath = "$PSScriptRoot\..\vendor\sources.json"
-)
+    [string]$sourcesPath = "$PSScriptRoot\..\vendor\sources.json",
 
-# Get the root directory of the cmder project.
-$cmder_root = Resolve-Path "$PSScriptRoot\.."
+    # Include pre-release versions (RC, beta, alpha, etc.)
+    # By default, only stable releases are considered
+    [switch]$IncludePrerelease = $false
+)
 
 # Dot source util functions into this scope
 . "$PSScriptRoot\utils.ps1"
 $ErrorActionPreference = "Stop"
 
 # Attempts to match the current link with the new link, returning the count of matching characters.
-function Match-Filenames {
+function Compare-Filename {
     param (
-        $url,
-        $downloadUrl,
-        $fromEnd
+        [Parameter(Mandatory = $true)]
+        [uri]$Url,
+
+        [Parameter(Mandatory = $true)]
+        [string]$DownloadUrl,
+
+        [bool]$FromEnd = $false
     )
 
-    $filename = [System.IO.Path]::GetFileName($url)
-    $filenameDownload = [System.IO.Path]::GetFileName($downloadUrl)
+    $filename = [System.IO.Path]::GetFileName($Url)
+    $filenameDownload = [System.IO.Path]::GetFileName($DownloadUrl)
 
     $position = 0
 
@@ -59,7 +64,7 @@ function Match-Filenames {
         throw "Either one or both filenames are empty!"
     }
 
-    if ($fromEnd) {
+    if ($FromEnd) {
         $arr = $filename -split ""
         [array]::Reverse($arr)
         $filename = $arr -join ''
@@ -79,11 +84,39 @@ function Match-Filenames {
     return $position
 }
 
+# Checks if a release is a pre-release based on GitHub API flag and version tag keywords
+# Pre-release keywords include: -rc (release candidate), -beta, -alpha, -preview, -pre
+function Test-IsPrerelease {
+    param (
+        [Parameter(Mandatory = $true)]
+        $release
+    )
+
+    # Check if marked as pre-release by GitHub
+    if ($release.prerelease -eq $true) {
+        return $true
+    }
+
+    # Check for common pre-release keywords in tag name
+    # This catches versions like v2.50.0-rc, v1.0.0-beta, v1.0.0-alpha, etc.
+    $prereleaseKeywords = @('-rc', '-beta', '-alpha', '-preview', '-pre')
+    foreach ($keyword in $prereleaseKeywords) {
+        if ($release.tag_name -ilike "*$keyword*") {
+            return $true
+        }
+    }
+
+    return $false
+}
+
 # Uses the GitHub api in order to fetch the current download links for the latest releases of the repo.
 function Fetch-DownloadUrl {
     param (
         [Parameter(Mandatory = $true)]
-        $urlStr
+        $urlStr,
+
+        [Parameter(Mandatory = $false)]
+        [bool]$includePrerelease = $false
     )
 
     $url = [uri] $urlStr
@@ -127,6 +160,13 @@ function Fetch-DownloadUrl {
     }
 
     :loop foreach ($i in $info) {
+        # Skip pre-release versions unless explicitly included
+        # Pre-releases include RC (Release Candidate), beta, alpha, and other test versions
+        if (-not $includePrerelease -and (Test-IsPrerelease $i)) {
+            Write-Verbose "Skipping pre-release version: $($i.tag_name)"
+            continue
+        }
+
         if (-not ($i.assets -is [array])) {
             continue
         }
@@ -141,7 +181,7 @@ function Fetch-DownloadUrl {
                 continue
             }
 
-            $score = Match-Filenames $url $a.browser_download_url
+            $score = Compare-Filename -Url $url -DownloadUrl $a.browser_download_url
 
             # Skip links that don't match or are less similar
             if ( ($score -eq 0) -or ($score -lt $charCount) ) {
@@ -164,26 +204,40 @@ function Fetch-DownloadUrl {
 
     # Special case for archive downloads of repository
     if (($null -eq $downloadLinks) -or (-not $downloadLinks)) {
-        if ((($p | ForEach-Object { $_.Trim('/') }) -contains "archive") -and $info[0].tag_name) {
-            for ($i = 0; $i -lt $p.Length; $i++) {
-                if ($p[$i].Trim('/') -eq "archive") {
-                    $p[$i + 1] = $info[0].tag_name + ".zip"
-                    $downloadLinks = $url.Scheme + "://" + $url.Host + ($p -join '')
-                    return $downloadLinks
+        if ((($p | ForEach-Object { $_.Trim('/') }) -contains "archive")) {
+            # Find the first release that matches our pre-release filtering criteria
+            $selectedRelease = $null
+            foreach ($release in $info) {
+                # Apply the same filtering logic
+                if (-not $includePrerelease -and (Test-IsPrerelease $release)) {
+                    continue
+                }
+                # Use the first release that passes the filter
+                $selectedRelease = $release
+                break
+            }
+
+            if ($selectedRelease -and $selectedRelease.tag_name) {
+                for ($i = 0; $i -lt $p.Length; $i++) {
+                    if ($p[$i].Trim('/') -eq "archive") {
+                        $p[$i + 1] = $selectedRelease.tag_name + ".zip"
+                        $downloadLinks = $url.Scheme + "://" + $url.Host + ($p -join '')
+                        return $downloadLinks
+                    }
                 }
             }
         }
         return ''
     }
 
-    $temp = $downloadLinks | Where-Object { (Match-Filenames $url $_) -eq $charCount }
+    $temp = $downloadLinks | Where-Object { (Compare-Filename -Url $url -DownloadUrl $_) -eq $charCount }
 
     $downloadLinks = (New-Object System.Collections.Generic.List[System.Object])
 
     $charCount = 0
 
     foreach ($l in $temp) {
-        $score = Match-Filenames $url $l true
+        $score = Compare-Filename -Url $url -DownloadUrl $l -FromEnd $true
 
         if ( ($score -eq 0) -or ($score -lt $charCount) ) {
             continue
@@ -192,7 +246,7 @@ function Fetch-DownloadUrl {
         $charCount = $score
     }
 
-    $downloadLinks = $temp | Where-Object { (Match-Filenames $url $_ true) -eq $charCount }
+    $downloadLinks = $temp | Where-Object { (Compare-Filename -Url $url -DownloadUrl $_ -FromEnd $true) -eq $charCount }
 
     if (($null -eq $downloadLinks) -or (-not $downloadLinks)) {
         throw "No suitable download links matched for the url!"
@@ -206,6 +260,8 @@ function Fetch-DownloadUrl {
 }
 
 $count = 0
+$hasBreakingChanges = $false
+$updateDetails = @()
 
 # Read the current sources content
 $sources = Get-Content $sourcesPath | Out-String | ConvertFrom-Json
@@ -215,7 +271,7 @@ foreach ($s in $sources) {
 
     Write-Verbose "Old Link: $($s.url)"
 
-    $downloadUrl = Fetch-DownloadUrl $s.url
+    $downloadUrl = Fetch-DownloadUrl $s.url -includePrerelease $IncludePrerelease
 
     if (($null -eq $downloadUrl) -or ($downloadUrl -eq '')) {
         Write-Verbose "No new links were found"
@@ -248,6 +304,26 @@ foreach ($s in $sources) {
         # }
 
         $count++
+
+        # Analyze version change type using shared function
+        $result = Get-VersionChangeType -OldVersion $s.version -NewVersion $version
+        $changeType = $result.ChangeType
+
+        # Determine if this is a breaking change
+        if ($changeType -eq "downgrade" -or $changeType -eq "major") {
+            $hasBreakingChanges = $true
+        } elseif ($changeType -eq "unknown") {
+            # If version parsing failed, treat as potentially breaking
+            $hasBreakingChanges = $true
+            Write-Verbose "Could not parse version as semantic version for dependency '$($s.name)' (old: '$($s.version)', new: '$version'), treating as potentially breaking"
+        }
+
+        $updateDetails += @{
+            name = $s.name
+            oldVersion = $s.version
+            newVersion = $version
+            changeType = $changeType
+        }
     }
 
     $s.url = $downloadUrl
@@ -257,16 +333,20 @@ foreach ($s in $sources) {
 $sources | ConvertTo-Json | Set-Content $sourcesPath
 
 if ($count -eq 0) {
-    Write-Host -ForegroundColor yellow "No new releases were found."
+    Write-ColorOutput -ForegroundColor Yellow -Message "No new releases were found."
     return
+}
+
+# Export update details for GitHub Actions
+if ($Env:GITHUB_ACTIONS -eq 'true') {
+    $updateDetailsJson = $updateDetails | ConvertTo-Json -Compress
+    Write-Output "UPDATE_DETAILS=$updateDetailsJson" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+    Write-Output "HAS_BREAKING_CHANGES=$hasBreakingChanges" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+    Write-Output "::notice title=Task Complete::Successfully updated $count dependencies."
 }
 
 if ($Env:APPVEYOR -eq 'True') {
     Add-AppveyorMessage -Message "Successfully updated $count dependencies." -Category Information
 }
 
-if ($Env:GITHUB_ACTIONS -eq 'true') {
-    Write-Output "::notice title=Task Complete::Successfully updated $count dependencies."
-}
-
-Write-Host -ForegroundColor green "Successfully updated $count dependencies."
+Write-ColorOutput -ForegroundColor Green -Message "Successfully updated $count dependencies."

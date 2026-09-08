@@ -1,6 +1,6 @@
 # Cmder
 
-[![Join the chat at https://gitter.im/cmderdev/cmder](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/cmderdev/cmder?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge) [![Build Status](https://ci.appveyor.com/api/projects/status/github/cmderdev/cmder?branch=master&svg=true)](https://ci.appveyor.com/project/cmderdev/cmder) [![Build Status](https://github.com/cmderdev/cmder/actions/workflows/build.yml/badge.svg)](https://github.com/cmderdev/cmder/actions/workflows/build.yml)
+[![Join the chat at https://gitter.im/cmderdev/cmder](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/cmderdev/cmder?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge) [![Build Status](https://github.com/cmderdev/cmder/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/cmderdev/cmder/actions/workflows/build.yml?query=event%3Apush+branch%3Amaster)
 
 Cmder is a **software package** created out of pure frustration over absence of usable console emulator on Windows. It is based on [ConEmu](https://conemu.github.io/) with *major* config overhaul, comes with a Monokai color scheme, amazing [clink](https://chrisant996.github.io/clink/) (further enhanced by [clink-completions](https://github.com/vladimir-kotikov/clink-completions)) and a custom prompt layout.
 
@@ -352,6 +352,10 @@ Cmder by default comes with a vendored ConEmu installation as the underlying ter
 
 However, Cmder can in fact run in a variety of other terminal emulators, and even integrated IDEs. Assuming you have the latest version of Cmder, follow the following instructions to get Cmder working with your own terminal emulator.
 
+⚠ *Note:* Cmder includes built-in support for Windows Terminal directory tracking via OSC 9;9 sequences. This enables "Duplicate Tab" and "Split Pane" features to preserve the current working directory for both `cmd.exe` and PowerShell sessions.
+
+⚠ *Note:* Cmder also includes built-in support for [Windows Terminal shell integration](https://learn.microsoft.com/en-us/windows/terminal/tutorials/shell-integration) via OSC 133 sequences (A, B, C, D) for PowerShell sessions. This enables features like command navigation (jump between commands), command selection, visual command separators, command exit code tracking, and improved command history management in Windows Terminal.
+
 For instructions on how to integrate Cmder with your IDE, please read our [Wiki section](https://github.com/cmderdev/cmder/wiki#cmder-integration).
 
 ## Upgrading
@@ -382,15 +386,14 @@ If you do not have a `[cmder_root]/config/user[-|_]conemu.xml`, you are running 
 3.  Delete the `[cmder_root]/vendor` folder.
 4.  Extract the new `cmder.zip` or `cmder_mini.zip` into `[cmder_root]/` overwriting all files when prompted.
 
-## Current development builds
+## Latest Builds
 
-You can download builds of the current development branch by going to AppVeyor via the following link:
+You can download the latest successful builds of the current [`master`](https://github.com/cmderdev/cmder/tree/master) and [`development`](https://github.com/cmderdev/cmder/tree/development) branches from the **GitHub Actions > Artifacts** section following the links below:
 
-[![AppVeyor](https://ci.appveyor.com/api/projects/status/github/cmderdev/cmder?svg=True)](https://ci.appveyor.com/project/cmderdev/cmder/branch/master/artifacts)
-
-The latest download builds by GitHub Actions can be downloaded from the link below:
-
-[![Build Status](https://github.com/cmderdev/cmder/actions/workflows/build.yml/badge.svg)](https://github.com/cmderdev/cmder/actions/workflows/build.yml)
+| Branch | Build Status | Download Artifacts |
+|--------|-------------|-------------------|
+| 🔒 [`master`](https://github.com/cmderdev/cmder/tree/master) | [![master build status](https://github.com/cmderdev/cmder/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/cmderdev/cmder/actions/workflows/build.yml?query=event%3Apush+branch%3Amaster+is%3Asuccess) | [📦 Artifacts](https://github.com/cmderdev/cmder/actions/workflows/build.yml?query=event%3Apush+branch%3Amaster+is%3Asuccess) |
+| 🔧 [`development`](https://github.com/cmderdev/cmder/tree/development) | [![development build status](https://github.com/cmderdev/cmder/actions/workflows/build.yml/badge.svg?branch=development)](https://github.com/cmderdev/cmder/actions/workflows/build.yml?query=event%3Apull_request+branch%3Adevelopment+is%3Asuccess) | [📦 Artifacts](https://github.com/cmderdev/cmder/actions/workflows/build.yml?query=event%3Apull_request+branch%3Adevelopment+is%3Asuccess) |
 
 ## License
 

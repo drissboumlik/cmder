@@ -27,7 +27,7 @@
 .EXAMPLE
     .\build.ps1 -SourcesPath '~/custom/vendors.json'
 
-    Build cmder with your own packages. See vendor/sources.json for the syntax you need to copy.
+    Build Cmder with your own packages. See vendor/sources.json for the syntax you need to copy.
 .NOTES
     AUTHORS
     Samuel Vasko, Jack Bennett
@@ -60,7 +60,7 @@ Param(
     [switch]$Compile
 )
 
-# Get the scripts and cmder root dirs we are building in.
+# Get the scripts and Cmder root dirs we are building in.
 $cmder_root = Resolve-Path "$PSScriptRoot\.."
 
 # Dot source util functions into this scope
@@ -115,7 +115,7 @@ if (-not $noVendor) {
 
     # Kill ssh-agent.exe if it is running from the $env:cmder_root we are building
     foreach ($ssh_agent in $(Get-Process ssh-agent -ErrorAction SilentlyContinue)) {
-        if ([string]$($ssh_agent.path) -Match [string]$cmder_root.replace('\', '\\')) {
+        if ([string]$($ssh_agent.path) -match [string]$cmder_root.replace('\', '\\')) {
             Write-Verbose $("Stopping " + $ssh_agent.path + "!")
             Stop-Process $ssh_agent.id
         }
@@ -178,4 +178,4 @@ if ( $Env:GITHUB_ACTIONS -eq 'true' ) {
     Write-Output "::notice title=Build Complete::Building Cmder v$version was successful."
 }
 
-Write-Host -ForegroundColor green "All good and done!"
+Write-ColorOutput -ForegroundColor Green -Message "All good and done!"
